@@ -1,0 +1,60 @@
+### Plik z przykładowymi żądaniami (REST Client / Visual Studio .http)
+### Bazowy adres — dostosuj port do launchSettings.json
+@host = http://localhost:5080
+
+### 1. Lista zgłaszających
+GET {{host}}/api/reporters
+
+### 2. Utworzenie zgłaszającego
+POST {{host}}/api/reporters
+Content-Type: application/json
+
+{
+  "fullName": "Piotr Wiśniewski",
+  "email": "piotr.wisniewski@example.com",
+  "phoneNumber": "+48600500600"
+}
+
+### 3. Lista zgłoszeń (paginacja + filtry)
+GET {{host}}/api/reports?page=1&pageSize=10&status=Nowe&type=Wypadek&city=Gdynia
+
+### 4. Pojedyncze zgłoszenie
+GET {{host}}/api/reports/1
+
+### 5. Utworzenie zgłoszenia
+POST {{host}}/api/reports
+Content-Type: application/json
+
+{
+  "title": "Powalone drzewo blokuje jezdnię",
+  "description": "Drzewo przewrócone po wichurze.",
+  "type": "Przeszkoda",
+  "city": "Sopot",
+  "street": "ul. Bohaterów Monte Cassino",
+  "latitude": 54.4416,
+  "longitude": 18.5601,
+  "occurredAt": "2026-06-17T08:30:00Z",
+  "reporterId": 1
+}
+
+### 6. Zmiana statusu (poprawne przejście: Nowe -> Zweryfikowane)
+PATCH {{host}}/api/reports/1/status
+Content-Type: application/json
+
+{
+  "newStatus": "Zweryfikowane"
+}
+
+### 7. Zmiana statusu (BŁĘDNE przejście — zwróci 400)
+PATCH {{host}}/api/reports/1/status
+Content-Type: application/json
+
+{
+  "newStatus": "Zakonczone"
+}
+
+### 8. Eksport CSV
+GET {{host}}/api/reports/export
+
+### 9. Usunięcie zgłoszenia
+DELETE {{host}}/api/reports/1
