@@ -1,40 +1,39 @@
-# Build results
-bin/
-obj/
-[Bb]in/
-[Oo]bj/
-[Dd]ebug/
-[Rr]elease/
-[Ll]ib/
-[Aa]rtifacts/
-[Bb]uild/
-
-# Visual Studio / VS Code
+# --- root-level / IDE ---
 .vs/
 .vscode/
+.idea/
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
 *.rsuser
 *.userprefs
+Thumbs.db
+.DS_Store
 
-# NuGet
-packages/
+# --- build output ---
+**/bin/
+**/obj/
+Debug/
+Release/
+Artifacts/
+Build/
+
+# --- NuGet ---
+**/packages/
 *.nupkg
 *.snupkg
 *.nuspec
-*.psmdcp
-project.lock.json
 packages.lock.json
+project.lock.json
 
-# Test / coverage results
-TestResults/
+# --- test results ---
+**/TestResults/
 *.trx
 *.coverage
 *.coveragexml
 
-# Compiled binaries and symbols
+# --- compiled artifacts ---
 *.dll
 *.exe
 *.app
@@ -42,23 +41,11 @@ TestResults/
 *.pdb
 *.log
 
-# Local tooling
-.idea/
-*.swp
-*.swo
-Thumbs.db
-.DS_Store
-
-# MSBuild generated files
+# --- MSBuild / local generated ---
 *.pidb
 *.svclog
 *.cache
 
-# ASP.NET Core runtime
-wwwroot/**/*.min.js
-wwwroot/**/*.css
-
-# Optional: local secrets / environment files
-# Keep these out only if you do not want to commit local-only settings.
+# --- optional local secrets ---
 # appsettings.Development.json
 # appsettings.Local.json
