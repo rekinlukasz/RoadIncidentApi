@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="RoadIncidentApi/RoadIncidentApi.csproj" />
+  <Project Path="RoadIncidentApi/RoadIncidentApi.UnitTests/RoadIncidentApi.UnitTests.csproj" />
+</Solution>
