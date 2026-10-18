@@ -147,4 +147,229 @@ public class ReportServiceTests
         await act.Should().ThrowAsync<DomainException>()
             .WithMessage("*Niedozwolona zmiana statusu*");
     }
+
+
+    [Fact]
+    public async Task CreateAsync_WithValidData_ShouldCreateReportAndReturnDto()
+    {
+        var dbName = nameof(CreateAsync_WithValidData_ShouldCreateReportAndReturnDto);
+        using var context = GetInMemoryDbContext(dbName);
+        context.Reporters.Add(new Reporter { Id = 1, FullName = "Jan Kowalski", Email = "jan@test.pl" });
+        await context.SaveChangesAsync();
+
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            Title = "Dziura w drodze",
+            Type = IncidentType.Przeszkoda,
+            City = "Gdańsk",
+            Latitude = 54.3520,
+            Longitude = 18.6466,
+            OccurredAt = DateTime.UtcNow,
+            ReporterId = 1
+        };
+
+        var result = await service.CreateAsync(dto);
+
+        result.Should().NotBeNull();
+        result.Title.Should().Be("Dziura w drodze");
+        result.Status.Should().Be(ReportStatus.Nowe);
+        result.ReporterName.Should().Be("Jan Kowalski");
+
+        using var assertContext = GetInMemoryDbContext(dbName);
+        var savedReport = await assertContext.Reports.FirstOrDefaultAsync(r => r.Id == result.Id);
+        savedReport.Should().NotBeNull();
+        savedReport!.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenReporterDoesNotExist_ShouldThrowDomainException()
+    {
+        var dbName = nameof(CreateAsync_WhenReporterDoesNotExist_ShouldThrowDomainException);
+        using var context = GetInMemoryDbContext(dbName);
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            Title = "Wypadek",
+            ReporterId = 999
+        };
+
+        Func<Task> act = async () => await service.CreateAsync(dto);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("Nie istnieje zgłaszający o id 999.");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenOccurredAtIsFarInFuture_ShouldThrowDomainException()
+    {
+        var dbName = nameof(CreateAsync_WhenOccurredAtIsFarInFuture_ShouldThrowDomainException);
+        using var context = GetInMemoryDbContext(dbName);
+        context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
+        await context.SaveChangesAsync();
+
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            ReporterId = 1,
+            OccurredAt = DateTime.UtcNow.AddMinutes(6)
+        };
+
+        Func<Task> act = async () => await service.CreateAsync(dto);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("Data wystąpienia zdarzenia nie może być z przyszłości.");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenOccurredAtIsWithin5MinTolerance_ShouldCreateReport()
+    {
+        var dbName = nameof(CreateAsync_WhenOccurredAtIsWithin5MinTolerance_ShouldCreateReport);
+        using var context = GetInMemoryDbContext(dbName);
+        context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
+        await context.SaveChangesAsync();
+
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            Title = "Tolerancja czasu",
+            ReporterId = 1,
+            OccurredAt = DateTime.UtcNow.AddMinutes(4)
+        };
+
+        var result = await service.CreateAsync(dto);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenDuplicateExistsWithin100Meters_ShouldThrowDomainException()
+    {
+        var dbName = nameof(CreateAsync_WhenDuplicateExistsWithin100Meters_ShouldThrowDomainException);
+        using var context = GetInMemoryDbContext(dbName);
+        context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
+        
+        context.Reports.Add(new IncidentReport
+        {
+            Type = IncidentType.Awaria,
+            Status = ReportStatus.WTrakcie,
+            Latitude = 54.000000,
+            Longitude = 18.000000,
+            ReporterId = 1
+        });
+        await context.SaveChangesAsync();
+
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            Title = "Duplikat",
+            Type = IncidentType.Awaria,
+            Latitude = 54.000100,
+            Longitude = 18.000100,
+            ReporterId = 1,
+            OccurredAt = DateTime.UtcNow
+        };
+
+        Func<Task> act = async () => await service.CreateAsync(dto);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("Istnieje już aktywne zgłoszenie tego samego typu w tej lokalizacji.");
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenReportIsSameTypeAndLocationButInactive_ShouldCreateReport()
+    {
+        var dbName = nameof(CreateAsync_WhenReportIsSameTypeAndLocationButInactive_ShouldCreateReport);
+        using var context = GetInMemoryDbContext(dbName);
+        context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
+        
+        context.Reports.Add(new IncidentReport
+        {
+            Type = IncidentType.Awaria,
+            Status = ReportStatus.Zakonczone,
+            Latitude = 54.000000,
+            Longitude = 18.000000,
+            ReporterId = 1
+        });
+        await context.SaveChangesAsync();
+
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            Type = IncidentType.Awaria,
+            Latitude = 54.000000,
+            Longitude = 18.000000,
+            ReporterId = 1,
+            OccurredAt = DateTime.UtcNow
+        };
+
+        var result = await service.CreateAsync(dto);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenReportIsSameLocationButDifferentType_ShouldCreateReport()
+    {
+        var dbName = nameof(CreateAsync_WhenReportIsSameLocationButDifferentType_ShouldCreateReport);
+        using var context = GetInMemoryDbContext(dbName);
+        context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
+        
+        context.Reports.Add(new IncidentReport
+        {
+            Type = IncidentType.Wypadek,
+            Status = ReportStatus.Nowe,
+            Latitude = 54.000000,
+            Longitude = 18.000000,
+            ReporterId = 1
+        });
+        await context.SaveChangesAsync();
+
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            Type = IncidentType.RobotyDrogowe,
+            Latitude = 54.000000,
+            Longitude = 18.000000,
+            ReporterId = 1,
+            OccurredAt = DateTime.UtcNow
+        };
+
+        var result = await service.CreateAsync(dto);
+
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenReportIsSameTypeButFarAway_ShouldCreateReport()
+    {
+        var dbName = nameof(CreateAsync_WhenReportIsSameTypeButFarAway_ShouldCreateReport);
+        using var context = GetInMemoryDbContext(dbName);
+        context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
+        
+        context.Reports.Add(new IncidentReport
+        {
+            Type = IncidentType.Przeszkoda,
+            Status = ReportStatus.Nowe,
+            Latitude = 54.000000,
+            Longitude = 18.000000,
+            ReporterId = 1
+        });
+        await context.SaveChangesAsync();
+
+        var service = new ReportService(context);
+        var dto = new CreateReportDto
+        {
+            Type = IncidentType.Przeszkoda,
+            Latitude = 54.500000,
+            Longitude = 18.500000,
+            ReporterId = 1,
+            OccurredAt = DateTime.UtcNow
+        };
+
+        var result = await service.CreateAsync(dto);
+
+        result.Should().NotBeNull();
+    }
+    
 }
