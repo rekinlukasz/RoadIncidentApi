@@ -23,16 +23,16 @@ public class ReportServiceTests
     public async Task ChangeStatusAsync_WithValidTransition_ShouldUpdateStatus()
     {
         var dbName = nameof(ChangeStatusAsync_WithValidTransition_ShouldUpdateStatus);
-        
+
         using (var context = GetInMemoryDbContext(dbName))
         {
             // Najpierw dodajemy zgłaszającego, aby spełnić relację klucza obcego
             var reporter = new Reporter { Id = 1, FullName = "Jan Kowalski", Email = "jan@example.com" };
             context.Reporters.Add(reporter);
 
-            context.Reports.Add(new IncidentReport 
-            { 
-                Id = 1, 
+            context.Reports.Add(new IncidentReport
+            {
+                Id = 1,
                 Status = ReportStatus.Nowe,
                 Title = "Test Incident",
                 Description = "Test Description",
@@ -89,9 +89,9 @@ public class ReportServiceTests
         using (var context = GetInMemoryDbContext(dbName))
         {
             context.Reporters.Add(new Reporter { Id = 1, FullName = "Jan Kowalski", Email = "jan@example.com" });
-            context.Reports.Add(new IncidentReport 
-            { 
-                Id = 1, 
+            context.Reports.Add(new IncidentReport
+            {
+                Id = 1,
                 Status = ReportStatus.Nowe,
                 Title = "Test",
                 Description = "Test",
@@ -122,9 +122,9 @@ public class ReportServiceTests
         using (var context = GetInMemoryDbContext(dbName))
         {
             context.Reporters.Add(new Reporter { Id = 1, FullName = "Jan Kowalski", Email = "jan@example.com" });
-            context.Reports.Add(new IncidentReport 
-            { 
-                Id = 1, 
+            context.Reports.Add(new IncidentReport
+            {
+                Id = 1,
                 Status = ReportStatus.Nowe,
                 Title = "Test",
                 Description = "Test",
@@ -248,7 +248,7 @@ public class ReportServiceTests
         var dbName = nameof(CreateAsync_WhenDuplicateExistsWithin100Meters_ShouldThrowDomainException);
         using var context = GetInMemoryDbContext(dbName);
         context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
-        
+
         context.Reports.Add(new IncidentReport
         {
             Type = IncidentType.Awaria,
@@ -282,7 +282,7 @@ public class ReportServiceTests
         var dbName = nameof(CreateAsync_WhenReportIsSameTypeAndLocationButInactive_ShouldCreateReport);
         using var context = GetInMemoryDbContext(dbName);
         context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
-        
+
         context.Reports.Add(new IncidentReport
         {
             Type = IncidentType.Awaria,
@@ -314,7 +314,7 @@ public class ReportServiceTests
         var dbName = nameof(CreateAsync_WhenReportIsSameLocationButDifferentType_ShouldCreateReport);
         using var context = GetInMemoryDbContext(dbName);
         context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
-        
+
         context.Reports.Add(new IncidentReport
         {
             Type = IncidentType.Wypadek,
@@ -346,7 +346,7 @@ public class ReportServiceTests
         var dbName = nameof(CreateAsync_WhenReportIsSameTypeButFarAway_ShouldCreateReport);
         using var context = GetInMemoryDbContext(dbName);
         context.Reporters.Add(new Reporter { Id = 1, FullName = "Test", Email = "t@t.pl" });
-        
+
         context.Reports.Add(new IncidentReport
         {
             Type = IncidentType.Przeszkoda,
@@ -371,5 +371,48 @@ public class ReportServiceTests
 
         result.Should().NotBeNull();
     }
-    
+
+    [Fact]
+    public async Task DeleteAsync_WhenReportExists_ShouldDeleteReport()
+    {
+        var dbName = nameof(DeleteAsync_WhenReportExists_ShouldDeleteReport);
+        using (var context = GetInMemoryDbContext(dbName))
+        {
+            context.Reporters.Add(new Reporter { Id = 1, FullName = "Jan Kowalski", Email = "jan@example.com" });
+            context.Reports.Add(new IncidentReport
+            {
+                Id = 1,
+                Title = "Test Incident",
+                Description = "Test Description",
+                City = "Warszawa",
+                Status = ReportStatus.Nowe,
+                ReporterId = 1,
+                OccurredAt = DateTime.UtcNow.AddHours(-1)
+            });
+            await context.SaveChangesAsync();
+        }
+
+        using var serviceContext = GetInMemoryDbContext(dbName);
+        var service = new ReportService(serviceContext);
+
+        await service.DeleteAsync(1);
+
+        using var assertContext = GetInMemoryDbContext(dbName);
+        var deletedReport = await assertContext.Reports.FindAsync(1);
+        deletedReport.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenReportDoesNotExist_ShouldThrowNotFoundException()
+    {
+        var dbName = nameof(DeleteAsync_WhenReportDoesNotExist_ShouldThrowNotFoundException);
+        using var context = GetInMemoryDbContext(dbName);
+        var service = new ReportService(context);
+
+        Func<Task> act = async () => await service.DeleteAsync(999);
+
+        await act.Should().ThrowAsync<NotFoundException>()
+            .WithMessage("Nie znaleziono zgłoszenia o id 999.");
+    }
+
 }
