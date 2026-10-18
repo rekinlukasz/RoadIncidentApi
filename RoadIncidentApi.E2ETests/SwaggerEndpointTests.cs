@@ -49,10 +49,7 @@ public class SwaggerEndpointTests : IAsyncLifetime
     [Fact]
     public async Task SwaggerEndpoint_ShouldReturnOpenApiDocument()
     {
-        var request = await _playwright!.APIRequest.NewContextAsync(new APIRequestNewContextOptions
-        {
-            BaseURL = _baseUrl
-        });
+        var request = await CreateRequestContextAsync();
 
         var response = await request.GetAsync("/swagger/v1/swagger.json");
 
@@ -61,6 +58,58 @@ public class SwaggerEndpointTests : IAsyncLifetime
         var content = await response.TextAsync();
         Assert.Contains("openapi", content, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("System zgłoszeń zdarzeń drogowych", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GetReports_ShouldReturnPagedList()
+    {
+        var request = await CreateRequestContextAsync();
+
+        var response = await request.GetAsync("/api/reports?page=1&pageSize=10");
+
+        Assert.Equal((int)System.Net.HttpStatusCode.OK, response.Status);
+
+        var json = await response.TextAsync();
+        Assert.Contains("items", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("totalItems", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateReport_ShouldCreateNewIncidentReport()
+    {
+        var request = await CreateRequestContextAsync();
+
+        var payload = new
+        {
+            title = "Nowe zgłoszenie E2E",
+            description = "Test E2E przez Playwright",
+            type = "Wypadek",
+            city = "Warszawa",
+            street = "ul. Testowa",
+            latitude = 52.2297,
+            longitude = 21.0122,
+            occurredAt = DateTime.UtcNow.AddHours(-1).ToString("O"),
+            reporterId = 1
+        };
+
+        var response = await request.PostAsync("/api/reports", new APIRequestContextOptions
+        {
+            DataObject = payload
+        });
+
+        Assert.Equal((int)System.Net.HttpStatusCode.Created, response.Status);
+
+        var json = await response.TextAsync();
+        Assert.Contains("Nowe zgłoszenie E2E", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Warszawa", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<IAPIRequestContext> CreateRequestContextAsync()
+    {
+        return await _playwright!.APIRequest.NewContextAsync(new APIRequestNewContextOptions
+        {
+            BaseURL = _baseUrl
+        });
     }
 
     private async Task WaitForAppToBeReadyAsync()
